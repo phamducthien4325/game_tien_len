@@ -1,0 +1,6 @@
+.311tien_len
+
+# Bỏ qua tất cả __pycache__ trong mọi thư mục con
+**/__pycache__/
+
+test.py
