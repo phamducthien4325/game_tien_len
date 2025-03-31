@@ -156,10 +156,11 @@ class Server:
                         played_type = classify_hand(cards)
 
                     if room.game.play_cards(player_name, cards) == f"Player {player_name} wins!":
+                        room.reset_game()
                         message = f"Player {player_name} wins!"
                         room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
                         self.room_message(room.room_name, room_message)
-                        message = f"You are back to the room."
+                        message = f"You are back to the waiting room."
                         message += f"\nRoom status:\n{room.status()}"
                         room_status_message = {'message': message, 'is_host': False, 'type': ServerCommandType.WAIT_ROOM}
                         self.room_message(room.room_name, room_status_message, exclude_player_name=room.host_name)

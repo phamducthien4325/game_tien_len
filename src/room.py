@@ -84,3 +84,8 @@ class Room:
             if player.name == client_name:
                 return player
         return None
+    
+    def reset_game(self):
+        self.Players = []
+        self.game = None
+        self.room_status = RoomStatus.WAITING
