@@ -53,8 +53,11 @@ class Client:
                 case ServerCommandType.PROMPT_CARDS:
                     # if server_message['clear_screen'] == True:
                     #     clear_screen()
-                    print(server_message['message'])
+                    print("\033[1;31;40m" + server_message['message'] + "\033[0m")
                     self.handle_prompt_cards(server_message['room_name'])
+
+                case ServerCommandType.END_GAME:
+                    print("\033[1;31;40m" + server_message['message'] + "\033[0m")
 
                 case _:
                     print("Unknown command type")
@@ -62,10 +65,9 @@ class Client:
         # self.send_messages()
 
     def handle_prompt_cards(self, room_name: str):
-        str_cards = input(f"Player {self.name}, please enter the card you want to play (e.g., 1h for Ace of Hearts): ")
-        input_cards_message = {'play_hand': str_cards, 'type': ClientCommandType.PLAY_HAND, 'client_name': self.name, 'room_name': room_name}
+        str_cards = input()
+        input_cards_message = {'play_hand': str_cards, 'type': ClientCommandType.PLAY_HAND, 'room_name': room_name}
         self.socket.send(pickle.dumps(input_cards_message))
-        print(input_cards_message)
 
     def handle_wait_room(self):
         # print("Please choose the command below:\n\nPress "1" to start the game.\nPress "2" to leave the room.")

@@ -103,142 +103,120 @@ class Server:
                         message = f"Room {room.room_name} is starting the game!"
                         room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
                         self.room_message(room.room_name, room_message)
-                        self.handle_start_game(client, room)
+                        self.handle_start_game(room)
                         
                 case ClientCommandType.PLAY_HAND:
-                    player_name = client_message['client_name']
+                    player_name = client['client_name']
                     room_name = client_message['room_name']
                     room = Server.Rooms[room_name]
+                    player = room.get_player_from_name(player_name)
                     previous_cards = room.get_previous_cards()
                     str_cards = client_message['play_hand']
-                    print(str_cards)
+                    if previous_cards != None:
+                        previous_hand_type = classify_hand(previous_cards)
+                    is_pass = False
                     if str_cards == "pass":
                         if previous_cards == None:
                             tmp = "You cannot pass in the first turn of a cycle."
                             tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
-                            self.room_message(room.room_name, tmp_message, reciver_name=player.name)
+                            self.room_message(room.room_name, tmp_message, reciver_name=player_name)
                             continue
-                        return previous_cards
-                    if not check_cards(str_cards):
-                        tmp = "Invalid card format. Please try again."
-                        tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
-                        self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                        continue
-                    cards = [get_card_from_str(card) for card in str_cards.split()]
-                    is_valid = True
-                    for card in cards:
-                        if not player.is_card_in_hand(card):
-                            tmp = f"You don't have card {card} in your hand. Please try again."
-                            tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                            self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                            is_valid = False
-                            break
-                    if not is_valid:
-                        continue
-                    played_type = classify_hand(cards)
-                    if played_type == HandType.INVALID:
-                        tmp = "Invalid hand. Please try again."
-                        tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                        self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                        continue
-                    if not is_suitable_for_previous_hand(cards, previous_cards):
-                        tmp = f"Invalid hand. You cannot play {played_type} {cards} after {previous_hand_type} {previous_cards}. Please try again."
-                        tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                        self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                        continue
-                    break
-                # #     check if hand is sutiable for the previous hand
-                # for card in cards:
-                #     player.remove_card(card)
-                # return cards
+                        is_pass = True
+
+                    if not is_pass:
+                        if not check_cards(str_cards):
+                            tmp = "Invalid card format. Please try again."
+                            tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
+                            self.room_message(room.room_name, tmp_message, reciver_name=player_name)
+                            continue
+                        cards = [get_card_from_str(card) for card in str_cards.split()]
+                        is_valid = True
+                        for card in cards:
+                            if not player.is_card_in_hand(card):
+                                tmp = f"You don't have card {card} in your hand. Please try again."
+                                tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
+                                self.room_message(room.room_name, tmp_message, reciver_name=player_name)
+                                is_valid = False
+                                break
+                        if not is_valid:
+                            continue
+                        played_type = classify_hand(cards)
+                        if played_type == HandType.INVALID:
+                            tmp = "Invalid hand. Please try again."
+                            tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
+                            self.room_message(room.room_name, tmp_message, reciver_name=player_name)
+                            continue
+                        if not is_suitable_for_previous_hand(cards, previous_cards):
+                            tmp = f"Invalid hand. You cannot play {played_type} {cards} after {previous_hand_type} {previous_cards}. Please try again."
+                            tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False, 'room_name': room_name}
+                            self.room_message(room.room_name, tmp_message, reciver_name=player_name)
+                            continue
+                    else:
+                        cards = previous_cards
+                        played_type = classify_hand(cards)
+
+                    if room.game.play_cards(player_name, cards) == f"Player {player_name} wins!":
+                        message = f"Player {player_name} wins!"
+                        room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
+                        self.room_message(room.room_name, room_message)
+                        message = f"You are back to the room."
+                        message += f"\nRoom status:\n{room.status()}"
+                        room_status_message = {'message': message, 'is_host': False, 'type': ServerCommandType.WAIT_ROOM}
+                        self.room_message(room.room_name, room_status_message, exclude_player_name=room.host_name)
+                        room_status_message = {'message': message, 'is_host': True, 'type': ServerCommandType.WAIT_ROOM}
+                        self.room_message(room.room_name, room_status_message, reciver_name=room.host_name)
+                    else:
+                        if is_pass:
+                            message = f"Player {player_name} passed."
+                        else:
+                            message = f"Player {player_name} played {played_type} {cards}."
+                        room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
+                        self.room_message(room.room_name, room_message)
+                        current_player_name = room.get_current_player_name()
+                        message = f"It's your turn to play!"
+                        previous_cards = room.get_previous_cards()
+                        if previous_cards != None:
+                            previous_hand_type = classify_hand(previous_cards)
+                            message += f"\nPrevious cards played {previous_hand_type} hand: {previous_cards}"
+                        else:
+                            message += f"\nA new turn cycle has started, you can play any cards."
+                        message += "\nYour cards: "
+                        message += room.get_card_of_player(current_player_name)
+                        message += "Please enter the card you want to play (e.g., 1h for Ace of Hearts): "
+                        send_message = {'message': message, 'room_name': room.room_name, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
+                        self.room_message(room.room_name, send_message, reciver_name=current_player_name)
                 
                 case _:
                     print("Unknown command type")
 
-    def handle_start_game(self, client, room: Room):
+    def handle_start_game(self, room: Room):
         room.start_game()
-        game = room.game
-        game.current_player_index = game.get_first_player()
 
-        # last_player_index = current_player_index
-        # remaining_plyers_per_turn = [i for i in range(game.number_of_players)]
-        # current_player = game.players[current_player_index]
-        # message = f"Player {current_player.name} starts the game."
-        # room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
-        # self.room_message(room.room_name, room_message)
-        # while True:
-        #     if current_player_index == last_player_index:
-        #         game.previous_cards = None
-        #     current_player = game.players[current_player_index]
-        #     played_cards = self.prompt_cards(room, client, current_player, game.previous_cards)
-        #     if played_cards != game.previous_cards:
-        #         last_player_index = current_player_index
-        #     else:
-        #         remaining_plyers_per_turn.remove(current_player_index)
-        #     game.previous_cards = played_cards
-        #     if current_player.is_winner():
-        #         message = f"Player {current_player_index + 1} wins!"
-        #         room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
-        #         self.room_message(room.room_name, room_message)
-        #         break
-        #     current_player_index = (current_player_index + 1) % game.number_of_players
-        #     while not current_player_index in remaining_plyers_per_turn:
-        #         current_player_index = (current_player_index + 1) % game.number_of_players
+        deck_dict = room.get_player_decks()
+        for player_name in room.get_client_name_list():
+            deck = deck_dict[player_name]
+            message = f"Your cards: {deck}"
+            room_message = {'message': message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
+            self.room_message(room.room_name, room_message, reciver_name=player_name)
 
-    def prompt_cards(self, room: Room, client, player: Player, previous_cards: list[Card] = None) -> list[Card]:
-        message = f"It's your turn!"
+        first_player_name = room.get_first_player_name()
+        first_player_message = f"Player {first_player_name} starts the game."
+        room_message = {'message': first_player_message, 'type': ServerCommandType.ROOM_MESSAGE, 'clear_screen': False}
+        self.room_message(room.room_name, room_message)
+
+        current_player_name = room.get_current_player_name()
+        message = f"It's your turn to play!"
+        previous_cards = room.get_previous_cards()
         if previous_cards != None:
             previous_hand_type = classify_hand(previous_cards)
             message += f"\nPrevious cards played {previous_hand_type} hand: {previous_cards}"
         else:
-            message += f"\nA new turn cycle has started, {player.name} can play any cards.\n"
-        message += "Your cards: "
-        message += player.get_str_cards()
-        send_message = {'message': message, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-        self.room_message(room.room_name, send_message, reciver_name=player.name)
-        while True:
-            play_hand_message = pickle.loads(client['connectionSocket'].recv(4096))
-            str_cards = play_hand_message['play_hand']
-            print(str_cards)
-            if str_cards == "pass":
-                if previous_cards == None:
-                    tmp = "You cannot pass in the first turn of a cycle."
-                    tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                    self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                    continue
-                return previous_cards
-            if not check_cards(str_cards):
-                tmp = "Invalid card format. Please try again."
-                tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                continue
-            cards = [get_card_from_str(card) for card in str_cards.split()]
-            is_valid = True
-            for card in cards:
-                if not player.is_card_in_hand(card):
-                    tmp = f"You don't have card {card} in your hand. Please try again."
-                    tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                    self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                    is_valid = False
-                    break
-            if not is_valid:
-                continue
-            played_type = classify_hand(cards)
-            if played_type == HandType.INVALID:
-                tmp = "Invalid hand. Please try again."
-                tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                continue
-            if not is_suitable_for_previous_hand(cards, previous_cards):
-                tmp = f"Invalid hand. You cannot play {played_type} {cards} after {previous_hand_type} {previous_cards}. Please try again."
-                tmp_message = {'message': tmp, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
-                self.room_message(room.room_name, tmp_message, reciver_name=player.name)
-                continue
-            break
-        #     check if hand is sutiable for the previous hand
-        for card in cards:
-            player.remove_card(card)
-        return cards
+            message += f"\nA new turn cycle has started, you can play any cards."
+        message += "\nYour cards: "
+        message += room.get_card_of_player(current_player_name)
+        message += "Please enter the card you want to play (e.g., 1h for Ace of Hearts): "
+        send_message = {'message': message, 'room_name': room.room_name, 'type': ServerCommandType.PROMPT_CARDS, 'clear_screen': False}
+        self.room_message(room.room_name, send_message, reciver_name=current_player_name)
 
     def handle_join_room(self, client, room_name):
         if room_name not in Server.Rooms.keys():
@@ -290,7 +268,7 @@ class Server:
                     client_socket = player['connectionSocket']
                     client_socket.send(pickle.dumps(message))
         else:
-            for player_name in room.players_name:
+            for player_name in room.get_client_name_list():
                 if player_name == exclude_player_name:
                     continue
                 for player in self.Players:

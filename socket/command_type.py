@@ -7,6 +7,7 @@ class ServerCommandType(enum.Enum):
     WAIT_ROOM = 'wait_room'
     ROOM_MESSAGE = 'room_message'
     PROMPT_CARDS = 'prompt_cards'
+    END_GAME = 'end_game'
     
 
 class ClientCommandType(enum.Enum):
